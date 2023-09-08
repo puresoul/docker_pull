@@ -21,13 +21,15 @@ import (
 var (
 	kernelName string
 	initrdName string
+	dev string
+	mountPath string
 )
 
 // BuildRootFS generates simple rootfs a from the stage 1 directory.
 func BuildRootFS(buildPath string, c vmconfig.Config) error {
 	targetName := strings.Split(filepath.Base(c.Path), ".")[0] + "_rootfs"
-	if *f_target != "" {
-		targetName = *f_target
+	if CF.F_target != "" {
+		targetName = CF.F_target
 	}
 
 	err := os.Mkdir(targetName, 0666)
@@ -47,8 +49,8 @@ func BuildRootFS(buildPath string, c vmconfig.Config) error {
 // BuildISO generates a bootable ISO from the stage 1 directory.
 func BuildISO(buildPath string, c vmconfig.Config) error {
 	targetName := strings.Split(filepath.Base(c.Path), ".")[0]
-	if *f_target != "" {
-		targetName = *f_target
+	if CF.F_target != "" {
+		targetName = CF.F_target
 	}
 
 	// Set up a temporary directory
@@ -104,7 +106,7 @@ func BuildISO(buildPath string, c vmconfig.Config) error {
 	}
 
 	// Copy over the ISOLINUX stuff
-	matches, err = filepath.Glob(*f_isolinux + "/*")
+	matches, err = filepath.Glob(CF.F_isolinux + "/*")
 	if err != nil {
 		return err
 	}
@@ -151,8 +153,8 @@ func BuildISO(buildPath string, c vmconfig.Config) error {
 // image is the one found in /boot of the build directory.
 func BuildTargets(buildPath string, c vmconfig.Config) error {
 	targetName := strings.Split(filepath.Base(c.Path), ".")[0]
-	if *f_target != "" {
-		targetName = *f_target
+	if CF.F_target != "" {
+		targetName = CF.F_target
 	}
 
 	wd, err := os.Getwd()
@@ -190,15 +192,15 @@ func BuildTargets(buildPath string, c vmconfig.Config) error {
 // BuildDisk creates a disk image using qemu-img, qemu-nbd, sfdisk, mkfs.ext3,
 // cp, and extlinux.
 func BuildDisk(buildPath string, c vmconfig.Config) error {
-	switch *f_format {
+	switch CF.F_format {
 	case "qcow", "qcow2", "raw", "vmdk":
 	default:
-		return fmt.Errorf("unknown disk format: %v", *f_format)
+		return fmt.Errorf("unknown disk format: %v", CF.F_format)
 	}
 
 	targetName := strings.Split(filepath.Base(c.Path), ".")[0]
-	if *f_target != "" {
-		targetName = *f_target
+	if CF.F_target != "" {
+		targetName = CF.F_target
 	}
 
 	if err := nbd.Modprobe(); err != nil {
@@ -211,13 +213,58 @@ func BuildDisk(buildPath string, c vmconfig.Config) error {
 	}
 
 	// Final disk target
-	out := filepath.Join(wd, targetName+"."+*f_format)
+	out := filepath.Join(wd, targetName+"."+CF.F_format)
 	// Temporary file, will be renamed to out
 	outTmp := out + ".tmp"
 
-	if err := createDisk(outTmp, *f_diskSize, *f_format); err != nil {
+	if err := createDisk(outTmp, CF.F_diskSize, CF.F_format); err != nil {
 		return err
 	}
+
+
+	dev, err = nbd.ConnectImage(outTmp)
+
+	if err != nil {
+		return err
+	}
+
+
+	if err = partitionDisk(dev); err != nil {
+		return err
+	}
+
+	if err := formatDisk(dev + "p1"); err != nil {
+		return err
+	}
+
+	mountPath, err = mountDisk(dev + "p1")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func FinishDisk(buildPath string,c vmconfig.Config) error {
+	targetName := strings.Split(filepath.Base(c.Path), ".")[0]
+	if CF.F_target != "" {
+		targetName = CF.F_target
+	}
+
+	if err := nbd.Modprobe(); err != nil {
+		return err
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	// Final disk target
+	out := filepath.Join(wd, targetName+"."+CF.F_format)
+	// Temporary file, will be renamed to out
+	outTmp := out + ".tmp"
+
 
 	// Cleanup our temporary building file
 	defer func() {
@@ -228,54 +275,27 @@ func BuildDisk(buildPath string, c vmconfig.Config) error {
 		}
 	}()
 
-	dev, err := nbd.ConnectImage(outTmp)
-	if err != nil {
-		return err
-	}
 
-/*	// Disconnect from the nbd device
+	// Disconnect from the nbd device
 	defer func() {
 		if err := nbd.DisconnectDevice(dev); err != nil {
 		}
-	}()*/
+	}()
 
-	if err = partitionDisk(dev); err != nil {
-		return err
-	}
-
-	if err := formatDisk(dev + "p1"); err != nil {
-		return err
-	}
-
-	_, err = mountDisk(dev + "p1")
-	if err != nil {
-		return err
-	}
-
-	return nil
-/*
 	if err := copyDisk(buildPath, mountPath); err != nil {
 		if err2 := umountDisk(mountPath); err2 != nil {
 		}
 		return err
 	}
 
-	if err := extlinux(mountPath); err != nil {
-		if err2 := umountDisk(mountPath); err2 != nil {
-		}
-		return err
-	}
 
 	if err := umountDisk(mountPath); err != nil {
 		return err
 	}
 
-	if err = extlinuxMBR(dev, *f_mbr); err != nil {
-		return err
-	}
-
-	return os.Rename(outTmp, out)*/
+	return os.Rename(outTmp, out)
 }
+
 
 // createDisk creates a target disk image using qemu-img. Size specifies the
 // size of the image in bytes but optional suffixes such as "K" and "G" can be
