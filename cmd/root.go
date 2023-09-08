@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"go_pull/pkgs/config"
+	"go_pull/pkgs/vmconfig"
 	"go_pull/pkgs/util/logtool"
 
 	"github.com/spf13/cobra"
@@ -20,7 +20,7 @@ var (
 )
 
 func init() {
-	logtool.InitEvent(config.DefaultLoglevel)
+	logtool.InitEvent(vmconfig.DefaultLoglevel)
 }
 
 func Execute() {

@@ -28,8 +28,8 @@ var (
 // BuildRootFS generates simple rootfs a from the stage 1 directory.
 func BuildRootFS(buildPath string, c vmconfig.Config) error {
 	targetName := strings.Split(filepath.Base(c.Path), ".")[0] + "_rootfs"
-	if CF.F_target != "" {
-		targetName = CF.F_target
+	if vmconfig.CF.F_target != "" {
+		targetName = vmconfig.CF.F_target
 	}
 
 	err := os.Mkdir(targetName, 0666)
@@ -49,8 +49,8 @@ func BuildRootFS(buildPath string, c vmconfig.Config) error {
 // BuildISO generates a bootable ISO from the stage 1 directory.
 func BuildISO(buildPath string, c vmconfig.Config) error {
 	targetName := strings.Split(filepath.Base(c.Path), ".")[0]
-	if CF.F_target != "" {
-		targetName = CF.F_target
+	if vmconfig.CF.F_target != "" {
+		targetName = vmconfig.CF.F_target
 	}
 
 	// Set up a temporary directory
@@ -106,7 +106,7 @@ func BuildISO(buildPath string, c vmconfig.Config) error {
 	}
 
 	// Copy over the ISOLINUX stuff
-	matches, err = filepath.Glob(CF.F_isolinux + "/*")
+	matches, err = filepath.Glob(vmconfig.CF.F_isolinux + "/*")
 	if err != nil {
 		return err
 	}
@@ -153,8 +153,8 @@ func BuildISO(buildPath string, c vmconfig.Config) error {
 // image is the one found in /boot of the build directory.
 func BuildTargets(buildPath string, c vmconfig.Config) error {
 	targetName := strings.Split(filepath.Base(c.Path), ".")[0]
-	if CF.F_target != "" {
-		targetName = CF.F_target
+	if vmconfig.CF.F_target != "" {
+		targetName = vmconfig.CF.F_target
 	}
 
 	wd, err := os.Getwd()
@@ -192,15 +192,15 @@ func BuildTargets(buildPath string, c vmconfig.Config) error {
 // BuildDisk creates a disk image using qemu-img, qemu-nbd, sfdisk, mkfs.ext3,
 // cp, and extlinux.
 func BuildDisk(buildPath string, c vmconfig.Config) error {
-	switch CF.F_format {
+	switch vmconfig.CF.F_format {
 	case "qcow", "qcow2", "raw", "vmdk":
 	default:
-		return fmt.Errorf("unknown disk format: %v", CF.F_format)
+		return fmt.Errorf("unknown disk format: %v", vmconfig.CF.F_format)
 	}
 
 	targetName := strings.Split(filepath.Base(c.Path), ".")[0]
-	if CF.F_target != "" {
-		targetName = CF.F_target
+	if vmconfig.CF.F_target != "" {
+		targetName = vmconfig.CF.F_target
 	}
 
 	if err := nbd.Modprobe(); err != nil {
@@ -213,11 +213,11 @@ func BuildDisk(buildPath string, c vmconfig.Config) error {
 	}
 
 	// Final disk target
-	out := filepath.Join(wd, targetName+"."+CF.F_format)
+	out := filepath.Join(wd, targetName+"."+vmconfig.CF.F_format)
 	// Temporary file, will be renamed to out
 	outTmp := out + ".tmp"
 
-	if err := createDisk(outTmp, CF.F_diskSize, CF.F_format); err != nil {
+	if err := createDisk(outTmp, vmconfig.CF.F_diskSize, vmconfig.CF.F_format); err != nil {
 		return err
 	}
 
@@ -247,8 +247,8 @@ func BuildDisk(buildPath string, c vmconfig.Config) error {
 
 func FinishDisk(buildPath string,c vmconfig.Config) error {
 	targetName := strings.Split(filepath.Base(c.Path), ".")[0]
-	if CF.F_target != "" {
-		targetName = CF.F_target
+	if vmconfig.CF.F_target != "" {
+		targetName = vmconfig.CF.F_target
 	}
 
 	if err := nbd.Modprobe(); err != nil {
@@ -261,7 +261,7 @@ func FinishDisk(buildPath string,c vmconfig.Config) error {
 	}
 
 	// Final disk target
-	out := filepath.Join(wd, targetName+"."+CF.F_format)
+	out := filepath.Join(wd, targetName+"."+vmconfig.CF.F_format)
 	// Temporary file, will be renamed to out
 	outTmp := out + ".tmp"
 

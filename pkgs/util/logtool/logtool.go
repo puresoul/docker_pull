@@ -4,7 +4,7 @@ import (
 	//"aopm-agnet/pkg/constant"
 	//"github.com/go-ini/ini"
 	//"github.com/natefinch/lumberjack"
-	"go_pull/pkgs/config"
+	"go_pull/pkgs/vmconfig"
 	"os"
 	"strings"
 	"time"
@@ -84,7 +84,7 @@ func getConfigLog(loglevel string) (level zap.AtomicLevel) {
 }
 
 func Setloglevel(loglevel string) {
-	if strings.ToLower(loglevel) == config.DefaultLoglevel {
+	if strings.ToLower(loglevel) == vmconfig.DefaultLoglevel {
 		return
 	}
 	level, e := zapcore.ParseLevel(loglevel)

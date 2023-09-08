@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"go_pull/pkgs/config"
+	"go_pull/pkgs/vmconfig"
 	"go_pull/pkgs/model"
 	"go_pull/pkgs/util/aes"
 	"go_pull/pkgs/util/check_path"
@@ -59,10 +59,10 @@ func init() {
 	downloadCmd.PersistentFlags().StringVarP(&platform, "platform", "p", "amd64",
 		"Select platform system architecture, such as arm64v8, among which v8 is the field variant if it exists")
 	downloadCmd.PersistentFlags().BoolVarP(&plist, "show", "s", false, "list platform system architecture")
-	downloadCmd.PersistentFlags().IntVarP(&config.Ptimeout, "timeout", "t", 3, "timeout/s of the request")
-	downloadCmd.PersistentFlags().IntVarP(&config.Piotimeout, "iotimeout", "o", 20, "iotimeout/s of the request")
-	downloadCmd.PersistentFlags().IntVarP(&config.Retry, "retry", "r", 5, "Connection failure is the maximum number of retries")
-	downloadCmd.PersistentFlags().StringVarP(&config.Loglevel, "level", "l", "debug", "log level: debug、info、warn、error")
+	downloadCmd.PersistentFlags().IntVarP(&vmconfig.Ptimeout, "timeout", "t", 3, "timeout/s of the request")
+	downloadCmd.PersistentFlags().IntVarP(&vmconfig.Piotimeout, "iotimeout", "o", 20, "iotimeout/s of the request")
+	downloadCmd.PersistentFlags().IntVarP(&vmconfig.Retry, "retry", "r", 5, "Connection failure is the maximum number of retries")
+	downloadCmd.PersistentFlags().StringVarP(&vmconfig.Loglevel, "level", "l", "debug", "log level: debug、info、warn、error")
 
 }
 
@@ -72,7 +72,7 @@ var downloadCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	Long:  `All software has versions. This is pull's`,
 	Run: func(cmd *cobra.Command, args []string) {
-		logtool.Setloglevel(config.Loglevel)
+		logtool.Setloglevel(vmconfig.Loglevel)
 		startdownload(args)
 	},
 }

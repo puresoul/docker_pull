@@ -1,4 +1,14 @@
-package vmbetter
+package vmconfig
+
+var (
+	Ptimeout   int
+	Piotimeout int
+	Retry      int
+	Loglevel   string
+    CF *Conf
+)
+
+const DefaultLoglevel = "debug"
 
 type Conf struct {
 F_debian_mirror string
@@ -19,10 +29,6 @@ F_target string
 F_dry_run bool
 }
 
-var (
-    CF *Conf
-)
-
 func init() {
 var cf Conf
 cf.F_debian_mirror = "http://mirrors.ocf.berkeley.edu/debian"
@@ -32,7 +38,7 @@ cf.F_stage2 = ""
 cf.F_branch = "testing"
 cf.F_disk = false
 cf.F_diskSize = "1G"
-cf.F_format = "qcow2"
+cf.F_format = "raw"
 cf.F_mbr = "/usr/lib/syslinux/mbr/mbr.bin"
 cf.F_iso = false
 cf.F_isolinux = "misc/isolinux/"

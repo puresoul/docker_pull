@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"go_pull/pkgs/config"
 	"go_pull/pkgs/util/logtool"
 	"go_pull/pkgs/vmconfig"
 	"go_pull/pkgs/vmbetter"
@@ -23,7 +22,7 @@ var (
 
 func init() {
 	rootCmd.AddCommand(convertCmd)
-	logtool.InitEvent(config.DefaultLoglevel)
+	logtool.InitEvent(vmconfig.DefaultLoglevel)
 }
 
 

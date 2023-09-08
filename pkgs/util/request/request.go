@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
-	"go_pull/pkgs/config"
+	"go_pull/pkgs/vmconfig"
 	"go_pull/pkgs/util/logtool"
 	"net"
 	"net/http"
@@ -106,10 +106,10 @@ func Requests(url string) *reqr {
 		SetTransport(&http.Transport{
 			Proxy:             http.ProxyFromEnvironment,
 			ForceAttemptHTTP2: true,
-			Dial: TimeoutDialer(time.Duration(config.Ptimeout)*time.Second,
-				time.Duration(config.Piotimeout)*time.Second),
+			Dial: TimeoutDialer(time.Duration(vmconfig.Ptimeout)*time.Second,
+				time.Duration(vmconfig.Piotimeout)*time.Second),
 		}).
-		SetRetryCount(config.Retry).
+		SetRetryCount(vmconfig.Retry).
 		SetRetryWaitTime(100 * time.Nanosecond).
 		AddRetryCondition(
 			func(response *resty.Response, err error) bool {
