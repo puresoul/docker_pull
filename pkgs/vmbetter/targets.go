@@ -14,15 +14,14 @@ import (
 	"path/filepath"
 	"strings"
 
-        "go_pull/pkgs/nbd"
-        "go_pull/pkgs/vmconfig"
+    "go_pull/pkgs/nbd"
+    "go_pull/pkgs/vmconfig"
 )
 
 var (
 	kernelName string
 	initrdName string
 	dev string
-	mountPath string
 )
 
 // BuildRootFS generates simple rootfs a from the stage 1 directory.
@@ -189,13 +188,42 @@ func BuildTargets(buildPath string, c vmconfig.Config) error {
 	return nil
 }
 
+func ExtractDocker(mount,file string) error {
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	f, err := ioutil.TempFile("", "docker_tar")
+	if err != nil {
+		return err
+	}
+
+	eName := f.Name()
+	initrdCommand := fmt.Sprintf("cd %v && tar xvfO \"%v\" --wildcards --no-anchored \"*.tar\" | tar xivf -", mount, wd+"/"+file)
+	f.WriteString(initrdCommand)
+	f.Close()
+
+	p := process("bash")
+	cmd := exec.Command(p, eName)
+
+	err = cmd.Run()
+	if err != nil {
+		return err
+	}
+
+	os.Remove(eName)
+	return nil
+}
+
+
 // BuildDisk creates a disk image using qemu-img, qemu-nbd, sfdisk, mkfs.ext3,
 // cp, and extlinux.
-func BuildDisk(buildPath string, c vmconfig.Config) error {
+func BuildDisk(buildPath string, c vmconfig.Config) (string, error) {
 	switch vmconfig.CF.F_format {
 	case "qcow", "qcow2", "raw", "vmdk":
 	default:
-		return fmt.Errorf("unknown disk format: %v", vmconfig.CF.F_format)
+		return "", fmt.Errorf("unknown disk format: %v", vmconfig.CF.F_format)
 	}
 
 	targetName := strings.Split(filepath.Base(c.Path), ".")[0]
@@ -203,13 +231,15 @@ func BuildDisk(buildPath string, c vmconfig.Config) error {
 		targetName = vmconfig.CF.F_target
 	}
 
-	if err := nbd.Modprobe(); err != nil {
-		return err
+	if vmconfig.CF.F_format != "raw" {
+		if err := nbd.Modprobe(); err != nil {
+			return "", err
+		}
 	}
 
 	wd, err := os.Getwd()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Final disk target
@@ -218,34 +248,46 @@ func BuildDisk(buildPath string, c vmconfig.Config) error {
 	outTmp := out + ".tmp"
 
 	if err := createDisk(outTmp, vmconfig.CF.F_diskSize, vmconfig.CF.F_format); err != nil {
-		return err
+		return "", err
 	}
 
-
-	dev, err = nbd.ConnectImage(outTmp)
-
-	if err != nil {
-		return err
-	}
-
+	if vmconfig.CF.F_format != "raw" {
+		dev, err = nbd.ConnectImage(outTmp)
+		if err != nil {
+			return "", err
+		}
+		dev = dev + "p1"
+	} else {
+		dev = outTmp
+	} 
 
 	if err = partitionDisk(dev); err != nil {
-		return err
+		return "", err
 	}
 
-	if err := formatDisk(dev + "p1"); err != nil {
-		return err
+	if vmconfig.CF.F_format == "raw" {
+		if err := kpartx(dev, "-a"); err != nil {
+			return "", err
+		}
+		dev, err = nbd.GetDevice("raw")
+		if err != nil {
+			return "", err
+		}
 	}
 
-	mountPath, err = mountDisk(dev + "p1")
+	if err := formatDisk(dev,"ext4"); err != nil {
+		return "", err
+	}
+
+	mountPath, err := mountDisk(dev)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return mountPath, nil
 }
 
-func FinishDisk(buildPath string,c vmconfig.Config) error {
+func FinishDisk(mountPath string,c vmconfig.Config) error {
 	targetName := strings.Split(filepath.Base(c.Path), ".")[0]
 	if vmconfig.CF.F_target != "" {
 		targetName = vmconfig.CF.F_target
@@ -265,31 +307,10 @@ func FinishDisk(buildPath string,c vmconfig.Config) error {
 	// Temporary file, will be renamed to out
 	outTmp := out + ".tmp"
 
-
-	// Cleanup our temporary building file
-	defer func() {
-		// Check if file exists
-		if _, err := os.Stat(outTmp); err == nil {
-			if err = os.Remove(outTmp); err != nil {
-			}
-		}
-	}()
-
-
-	// Disconnect from the nbd device
-	defer func() {
-		if err := nbd.DisconnectDevice(dev); err != nil {
-		}
-	}()
-
-	if err := copyDisk(buildPath, mountPath); err != nil {
-		if err2 := umountDisk(mountPath); err2 != nil {
-		}
+	if err := umountDisk(mountPath); err != nil {
 		return err
 	}
-
-
-	if err := umountDisk(mountPath); err != nil {
+	if err := kpartx(outTmp,"-d"); err != nil {
 		return err
 	}
 
@@ -341,25 +362,25 @@ func partitionDisk(dev string) error {
 		return err
 	}
 
-
-
 	err = cmd.Start()
 	if err != nil {
 		return err
 	}
-	io.WriteString(sIn, ",,,*\n")
+	io.WriteString(sIn, ",500M\n,\n")
 	sIn.Close()
 	return cmd.Wait()
 }
 
 // formatDis formats a partition with the default linux filesystem type.
-func formatDisk(dev string) error {
+func formatDisk(dev,t string) error {
 	// make an ext3 filesystem
 	p := process("mkfs")
 	cmd := &exec.Cmd{
 		Path: p,
 		Args: []string{
 			p,
+			"-t",
+			t,
 			dev,
 		},
 		Env: nil,
@@ -369,6 +390,24 @@ func formatDisk(dev string) error {
 
 	return cmd.Run()
 }
+
+
+func kpartx(file, arg string) error {
+	p := process("kpartx")
+	cmd := &exec.Cmd{
+		Path: p,
+		Args: []string{
+			p,
+			arg,
+			file,
+		},
+		Env: nil,
+		Dir: "",
+	}
+
+	return cmd.Run()
+}
+
 
 // mountDisk mounts a partition to a temporary directory. If successful,
 // returns the path to that temporary directory.

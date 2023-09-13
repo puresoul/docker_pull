@@ -25,6 +25,7 @@ var externalProcesses = map[string]string{
 	"bash":        "bash",
 	"mksquashfs":  "mksquashfs",
 	"genisoimage": "genisoimage",
+	"kpartx":	   "kpartx",
 }
 
 // check for the presence of each of the external processes we may call,

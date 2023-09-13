@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-        "go_pull/pkgs/vmconfig"
 )
 
 // PostBuildCommands invokes any commands listed in the postbuild variable
@@ -17,11 +16,7 @@ import (
 // variable into a bash script under /tmp of the build directory, and then
 // executing it with bash inside of a chroot. Post build commands are executed
 // in depth-first order.
-func PostBuildCommands(buildPath string, c vmconfig.Config) error {
-	if len(c.Postbuilds) == 0 {
-		return nil
-	}
-
+func PostBuild(buildPath string) error {
 	// mount /dev and /proc inside the chroot
 	proc := filepath.Join(buildPath, "proc")
 	if err := exec.Command("mount", "-t", "proc", "none", proc).Run(); err != nil {
@@ -43,20 +38,19 @@ func PostBuildCommands(buildPath string, c vmconfig.Config) error {
 		}
 	}()
 
-	for _, pb := range c.Postbuilds {
 
-		tmpfile := buildPath + "/tmp/postbuild.bash"
+	tmpfile := buildPath + "/tmp/postbuild.bash"
 
-		ioutil.WriteFile(tmpfile, []byte(pb), 0770)
+	ioutil.WriteFile(tmpfile, []byte("grub-install /dev/loop0; update-grub2"), 0770)
 
-		p := process("chroot")
-		cmd := exec.Command(p, buildPath, "/bin/bash", "/tmp/postbuild.bash")
+	p := process("chroot")
+	cmd := exec.Command(p, buildPath, "/bin/bash", "/tmp/postbuild.bash")
 
-		err := cmd.Run()
-		if err != nil {
-			return err
-		}
-		os.Remove(tmpfile)
+	err := cmd.Run()
+	if err != nil {
+		return err
 	}
+	os.Remove(tmpfile)
+
 	return nil
 }

@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
@@ -66,9 +67,16 @@ func Ready() error {
 
 // GetDevice returns the first available NBD. If there are no devices
 // available, returns ErrNoDeviceAvailable.
-func GetDevice() (string, error) {
+func GetDevice(t string) (string, error) {
 	// Get a list of all devices
-	devFiles, err := ioutil.ReadDir("/dev")
+	var d string
+	if t == "raw" {
+		d = "/dev/mapper/"
+	} else {
+		d = "/dev"
+	}
+
+	devFiles, err := ioutil.ReadDir(d)
 	if err != nil {
 		return "", err
 	}
@@ -78,6 +86,11 @@ func GetDevice() (string, error) {
 	// Find the first available nbd
 	for _, devInfo := range devFiles {
 		dev := devInfo.Name()
+		fmt.Println(devInfo.Name())
+		if strings.Contains(dev, "loop") {
+			nbdPath = filepath.Join(d, dev)
+			break
+		}
 		// we don't want to include partitions here
 		if !strings.Contains(dev, "nbd") || strings.Contains(dev, "p") {
 			continue
@@ -87,7 +100,7 @@ func GetDevice() (string, error) {
 		_, err = os.Stat(filepath.Join("/sys/block", dev, "pid"))
 		if err != nil {
 			log.Println("found available nbd: " + dev)
-			nbdPath = filepath.Join("/dev", dev)
+			nbdPath = filepath.Join(d, dev)
 			break
 		} else {
 			log.Println("nbd %v could not be used", dev)
@@ -108,7 +121,7 @@ func ConnectImage(image string) (string, error) {
 	var err error
 
 	for i := 0; i < maxConnectRetries; i++ {
-		nbdPath, err = GetDevice()
+		nbdPath, err = GetDevice("nbd")
 		if err != ErrNoDeviceAvailable {
 			break
 		}

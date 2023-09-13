@@ -28,6 +28,21 @@ func init() {
 
 func convert(args []string) {
     conf := vmconfig.Config{Path: "tmp"}
-    err := vmbetter.BuildDisk("./", conf)
+    mount, err := vmbetter.BuildDisk("./", conf)
+    fmt.Println(err)	
+	if err != nil {
+		return
+	}
+	err = vmbetter.ExtractDocker(mount, args[0])
+    fmt.Println(err)
+	if err != nil {
+		return
+	}
+/*	err = vmbetter.PostBuild(mount)
+    fmt.Println(err)
+	if err != nil {
+		return
+	}*/
+	err = vmbetter.FinishDisk(mount,conf)
     fmt.Println(err)
 }
